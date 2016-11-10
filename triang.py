@@ -166,23 +166,29 @@ class Triangulation:
 			c.stroke(line(fro, to), [deco.earrow(size=0.1), color.rgb.blue])
 		return c
 
-	def simple(self, v):
-		return Module(self, v, v)
 
 	def stringExtensions(self, string):
+		"""Finds all possible one-letter extensions for a string,
+		including both direct and inverse letters"""
 		candidates = self.quiver.neighbors(string[-1])
 		candidates.remove(string[-2])
 		return filter(lambda x: not self.inCycle(string[-1], \
 		string[-2], x), candidates)
 
 	def stringOutExtensions(self, string):
+		"""Finds all possible one-direct-letter extensions for a string"""
 		candidates = self.quiver.outNeighbors(string[-1])
 		if string[-2] in candidates:
 			candidates.remove(string[-2])
 		return filter(lambda x: not self.inCycle(string[-1], \
 		string[-2], x), candidates)
 
+	def simple(self, v):
+		return Module(self, v, v)
+
 	def projExtend(self, string):
+		"""Returns the last letter of the longest direct-letter
+		extension of the string"""
 		ext = self.stringOutExtensions(string)
 		if ext:
 			return self.projExtend(string + ext)
@@ -212,7 +218,7 @@ class Module:
 				paths.extend([curPath+[i] for i in \
 				self.triang.stringExtensions(curPath)])
 
-	def computeTop(self):
+	def top(self):
 		if len(self.string) == 1:
 			return (self.string[0],)
 		else:
@@ -236,7 +242,7 @@ class Module:
 	def __init__(self, triang, start, end):
 		self.triang = triang
 		self.string = self.generateString(start, end)
-		self.top = self.computeTop()
+		self.top = self.top()
 
 	def draw(self, c=None):
 		if c is None:
@@ -259,3 +265,5 @@ class Module:
 if __name__ == '__main__':
 	t = Triangulation(randomTree(16))
 	t.draw().writePDFfile("random")
+	for n, mod in enumerate(t.quiver.vertices):
+		t.projective(mod).draw().writePDFfile("proj" + str(n))
