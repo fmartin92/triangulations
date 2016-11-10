@@ -1,5 +1,6 @@
 from math import pi, cos, sin
 from pyx import *
+from random import randint
 
 def generateTrees(nodes):
 	if nodes == 0:
@@ -12,6 +13,13 @@ def generateTrees(nodes):
 				for rightBranch in prev[nodes-i-1]:
 					trees.append(Tree(0, leftBranch, rightBranch))
 		return trees
+
+def randomTree(nodes):
+	if nodes == 0:
+		return None
+	left = randint(0, nodes-1)
+	right = nodes-1-left
+	return Tree(0, randomTree(left), randomTree(right))
 
 def midpoint(x, y):
 	return [(x[i] + y[i])/2 for i in range(2)]
@@ -57,6 +65,18 @@ class Triangle:
 			if v not in edge:
 				return v
 
+class Quiver:
+	def __init__(self, vertices, arrows):
+		self.vertices = vertices
+		self.arrows = arrows
+
+	def inNeighbors(self, v):
+		return [a[0] for a in self.arrows if a[1]==v]
+	def outNeighbors(self, v):
+		return [a[1] for a in self.arrows if a[0]==v]
+	def neighbors(self, v):
+		return self.outNeighbors(v) + self.inNeighbors(v)
+
 class Triangulation:
 	def findEdges(self, tree, start, end):
 		if tree.left:
@@ -94,7 +114,7 @@ class Triangulation:
 				if curEdge in self.edges:
 					quiver.append((edge, curEdge))
 					break
-		return quiver
+		return Quiver(self.edges, quiver)
 
 	def findTriangles(self):
 		triangles = []
@@ -111,6 +131,12 @@ class Triangulation:
 		isInner = lambda edge: edge in self.edges
 		return [triangle for triangle in self.triangles if \
 		reduce(lambda x, y: x and y, [isInner(edge) for edge in triangle])]
+
+	def inCycle(self, v0, v1, v2):
+		for i in self.innTriangles:
+			if v0 in i and v1 in i and v2 in i:
+				return True
+		return False
 
 	def __init__(self, treeRep):
 		self.treeRep = treeRep
@@ -132,21 +158,89 @@ class Triangulation:
 		for edge in self.edges:
 			c.stroke(line(self.vCoords(edge[0]), self.vCoords(edge[1])))
 		#flechas del quiver
-		for arrow in self.quiver:
+		for arrow in self.quiver.arrows:
 			fro = midpoint(self.vCoords(arrow[0][0]), \
 			self.vCoords(arrow[0][1]))
 			to = midpoint(self.vCoords(arrow[1][0]), \
 			self.vCoords(arrow[1][1]))
-			c.stroke(line(fro, to), [deco.earrow()])
+			c.stroke(line(fro, to), [deco.earrow(size=0.1), color.rgb.blue])
 		return c
 
-class Module:
-	def __init__(self, triang, string):
-		self.triang = triang
-		self.string = string
+	def simple(self, v):
+		return Module(self, v, v)
 
-	def draw(self):
-		c = self.triang.draw()
+	def stringExtensions(self, string):
+		candidates = self.quiver.neighbors(string[-1])
+		candidates.remove(string[-2])
+		return filter(lambda x: not self.inCycle(string[-1], \
+		string[-2], x), candidates)
+
+	def stringOutExtensions(self, string):
+		candidates = self.quiver.outNeighbors(string[-1])
+		if string[-2] in candidates:
+			candidates.remove(string[-2])
+		return filter(lambda x: not self.inCycle(string[-1], \
+		string[-2], x), candidates)
+
+	def projExtend(self, string):
+		ext = self.stringOutExtensions(string)
+		if ext:
+			return self.projExtend(string + ext)
+		else:
+			return string[-1]
+
+	def projective(self, v):
+		out = self.quiver.outNeighbors(v)
+		if len(out) == 0:
+			return self.simple(v)
+		elif len(out) == 1:
+			return Module(self, v, self.projExtend([v, out[0]]))
+		else:
+			return Module(self, self.projExtend([v, out[1]]), \
+			self.projExtend([v, out[0]]))
+			
+class Module:
+	def generateString(self, start, end):
+		if start == end:
+			return (start,)
+		paths = [[start, v] for v in self.triang.quiver.neighbors(start)]
+		while paths:
+			curPath = paths.pop(0)
+			if curPath[-1] == end:
+				return curPath
+			else:
+				paths.extend([curPath+[i] for i in \
+				self.triang.stringExtensions(curPath)])
+
+	def computeTop(self):
+		if len(self.string) == 1:
+			return (self.string[0],)
+		else:
+			n = len(self.string)
+			flag = False
+			top = ()
+			for i in range(n-1):
+				if (self.string[i], self.string[i+1]) \
+				in self.triang.quiver.arrows:
+					if not flag:
+						top += (self.string[i],)
+						flag = True
+				else:
+					if flag:
+						flag = False
+			if (self.string[-1], self.string[-2]) \
+			in self.triang.quiver.arrows:
+				top += (self.string[-1],)
+		return top
+
+	def __init__(self, triang, start, end):
+		self.triang = triang
+		self.string = self.generateString(start, end)
+		self.top = self.computeTop()
+
+	def draw(self, c=None):
+		if c is None:
+			c = self.triang.draw()
 		#el caso simple se hace aparte
 		if len(self.string) > 1:
 			[t1] = [t for t in self.triang.triangles \
@@ -156,21 +250,12 @@ class Module:
 		else:
 			[t1, t2] = [t for t in self.triang.triangles \
 				if self.string[0] in t]
-				
+
 		fro = self.triang.vCoords(t1.otherVertex(self.string[0]))
 		to = self.triang.vCoords(t2.otherVertex(self.string[-1]))
 		c.stroke(line(fro, to), [color.rgb.red])
 		return c
 
 if __name__ == '__main__':
-	#test: triangulaciones del heptagono
-	#n = 1
-	#for i in generateTrees(6):
-	#	Triangulation(i).draw().writePDFfile("triang" + str(n))
-	#	n += 1
-
-	string = [(5,7), (5,9)]
-	a = Triangulation(generateTrees(8)[16])
-	a.draw().writePDFfile("triang")
-	mod = Module(a, string)
-	mod.draw().writePDFfile("mod")
+	t = Triangulation(randomTree(16))
+	t.draw().writePDFfile("random")
