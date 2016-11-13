@@ -14,6 +14,12 @@ def generateTrees(nodes):
                     trees.append(Tree(0, leftBranch, rightBranch))
         return trees
 
+def anTree(nodes):
+    if nodes == 0:
+        return None
+    else:
+        return Tree(0, anTree(nodes-1), None)
+
 def randomTree(nodes):
     if nodes == 0:
         return None
@@ -219,7 +225,7 @@ class Module:
                 paths.extend([curPath+[i] for i in \
                 self.triang.stringExtensions(curPath)])
 
-    def top(self):
+    def getTop(self):
         if len(self.string) == 1:
             return (self.string[0],)
         else:
@@ -235,7 +241,7 @@ class Module:
                 top += (self.string[-1],)
         return top
 
-    def socle(self):
+    def getSocle(self):
         if len(self.string) == 1:
             return (self.string[0],)
         else:
@@ -254,8 +260,8 @@ class Module:
     def __init__(self, triang, start, end):
         self.triang = triang
         self.string = self.generateString(start, end)
-        self.top = self.top()
-        self.socle = self.socle()
+        self.top = self.getTop()
+        self.socle = self.getSocle()
 
     def __eq__(self, other):
         return True if (self.string == other.string) \
@@ -337,11 +343,26 @@ class Module:
 
         return mods
 
+    def projectiveCover(self):
+        return tuple(self.triang.projective(v) for v in self.top)
+
+    def nthProjective(self, n):
+        if n == 1:
+            return self.projectiveCover()
+        else:
+            mods = ()
+            for syz in self.omega(False):
+                mods += syz.nthProjective(n-1)
+            return mods
+
+    def projResolution(self, n):
+        return tuple(self.nthProjective(i) for i in range(1, n))
+
 def dr(obj):
     obj.draw().writePDFfile("random")
 
 if __name__ == '__main__':
-    t = Triangulation(randomTree(30))
+    t = Triangulation(anTree(25))
     t.draw().writePDFfile("random")
     v = t.quiver.vertices
     m = Module(t, v[0], v[randint(1, len(v))])
