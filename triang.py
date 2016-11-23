@@ -33,8 +33,11 @@ def midpoint(x, y):
 def line(p1, p2):
     return path.line(p1[0], p1[1], p2[0], p2[1])
 
-def flatten(lst):
-    return [val for sublst in lst for val in sublst]
+def iterate(f, n, x):
+    if n == 1:
+        return f(x)
+    else:
+        return f(iterate(f, n-1, x))
 
 class Tree:
     def __init__(self, root, left=None, right=None):
@@ -56,10 +59,7 @@ class Triangle:
         return self.edges.__iter__()
 
     def __contains__(self, item):
-        if item in self.edges:
-            return True
-        else:
-            return False
+        return item in self.edges
 
     def otherVertex(self, edge):
         for v in self.vertices:
@@ -211,6 +211,11 @@ class Triangulation:
         else:
             return Module(self, self.projExtend([v, out[1]])[-1], \
             self.projExtend([v, out[0]])[-1])
+
+    def randomModule(self):
+        start = self.quiver.vertices[randint(1, len(v)-1)]
+        end =  self.quiver.vertices[randint(1, len(v)-1)]
+        return Module(self, start, end)
             
 class Module:
     def generateString(self, start, end):
@@ -264,8 +269,8 @@ class Module:
         self.socle = self.getSocle()
 
     def __eq__(self, other):
-        return True if (self.string == other.string) \
-        or (self.string[::-1] == other.string) else False
+        return (self.string == other.string) or \
+               (self.string[::-1] == other.string)
 
     def __repr__(self):
         rep = ''
@@ -279,7 +284,7 @@ class Module:
         rep += str(self.string[-1])
         return rep
 
-    def draw(self, c=None):
+    def draw(self, c=None, col=color.rgb.red):
         if c is None:
             c = self.triang.draw()
         #el caso simple se hace aparte
@@ -294,7 +299,7 @@ class Module:
 
         fro = self.triang.vCoords(t1.otherVertex(self.string[0]))
         to = self.triang.vCoords(t2.otherVertex(self.string[-1]))
-        c.stroke(line(fro, to), [color.rgb.red])
+        c.stroke(line(fro, to), [col])
         return c
 
     def isProjective(self):
@@ -358,13 +363,35 @@ class Module:
     def projResolution(self, n):
         return tuple(self.nthProjective(i) for i in range(1, n))
 
+    def Hom(self, target):
+        for v in self.top:
+            if v not in target.string:
+                return 0
+        return 1
+
+    def Ext1(self, target):
+        omega = self.omega()
+        dim = 0
+        for m in omega:
+            dim += m.Hom(target)
+        return dim
+
+
 def dr(obj):
     obj.draw().writePDFfile("random")
 
+def ddr(mods):
+    mods[1].draw(mods[0].draw(col=color.rgb.green)).writePDFfile("random")
+
 if __name__ == '__main__':
-    t = Triangulation(anTree(25))
+    t = Triangulation(randomTree(15))
     t.draw().writePDFfile("random")
     v = t.quiver.vertices
-    m = Module(t, v[0], v[randint(1, len(v))])
+    m1 = t.randomModule()
+    m2 = t.randomModule()
+    mm = [m1, m2]
+    print m1
+    print m2
+    ddr(mm)
     #for n, mod in enumerate(t.quiver.vertices):
     #   t.projective(mod).draw().writePDFfile("proj" + str(n))
